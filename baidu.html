@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+	<style type="text/css">
+		#allmap{
+			height:500px;
+		}
+		#displayTable,td{
+			border: 1px solid black;
+		}
+		td {
+			padding:3px;
+		}
+		
+	</style>
+	<script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=您的密钥"></script>
+	<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.js"></script>
+	<title>EQ Queries</title>
+</head>
+<body>
+	<div id="allmap"></div>
+	<div>
+      Enter Lat: <input type="number" step="0.01" name="searchlat" id="searchlat">
+      <br>
+      Enter Lon: <input type="number" step="0.01" name="searchlon" id="searchlon">
+      <br>
+      <button type="button" id="search" onclick="filterData()"> Search </button>
+
+    </div>
+	<div>
+		<table id ="displayTable">
+        <tr>
+          <td>Title</td>
+          <td>Latitude</td>
+          <td>Longitude</td>
+          <td>Magnitude</td>
+          <td>Effective Radius</td>
+          <td>Time</td>
+        </tr>
+      	</table>
+
+	</div>
+</body>
+</html>
+<script type="text/javascript">
+	// 百度地图API功能
+	var map;
+	var global_data;
+
+	function initialize(){
+		map = new BMap.Map("allmap");    // 创建Map实例
+		map.centerAndZoom(new BMap.Point(116.404, 39.915), 2);  // 初始化地图,设置中心点坐标和地图级别
+		map.addControl(new BMap.MapTypeControl());   //添加地图类型控件
+		map.setCurrentCity("北京");          // 设置地图显示的城市 此项是必须设置的
+		map.enableScrollWheelZoom(true);     //开启鼠标滚轮缩放
+
+		loadData();
+	}
+	function loadData(){
+        
+        $.getJSON('pdata.json',function(input){
+          global_data = input;
+          displayData(global_data)
+        });
+
+     }
+     function displayData(data){
+     	//clear all existing overlays
+     	map.clearOverlays();
+     	//set the columns fof the table
+        var table = document.getElementById("displayTable");
+        table.innerHTML="";
+        var firstRow = table.insertRow(0);
+        firstRow.insertCell(0).innerHTML = "Title";
+        firstRow.insertCell(1).innerHTML = "Latitude";
+        firstRow.insertCell(2).innerHTML = "Longitude";
+        firstRow.insertCell(3).innerHTML = "Magnitude";
+        firstRow.insertCell(4).innerHTML = "Effective Radius";
+        firstRow.insertCell(5).innerHTML = "Time";
+
+        var rowCounter = 1;
+       	for (var key in data){
+			var values = data[key];
+			// add earthquake to google maps
+			var c = new BMap.Point(values.lon,values.lat);
+			var r = values.effective_radius;
+	    	var circle = new BMap.Circle(c,r*1000);
+	    	circle.setFillColor("#A6CBA1"); //填充颜色
+		    circle.setStrokeColor("#A6CBA1"); //边线颜色
+		    circle.setFillOpacity(0.01);
+		    circle.setStrokeOpacity(0.5);
+		    circle.setStrokeWeight(1);
+	    	map.addOverlay(circle);
+
+	    	// add earthquake to displayTable
+			var tempRow = table.insertRow(rowCounter);
+			tempRow.insertCell(0).innerHTML = values.title;
+			tempRow.insertCell(1).innerHTML = values.lat;
+			tempRow.insertCell(2).innerHTML = values.lon;
+			tempRow.insertCell(3).innerHTML = values.mag;
+			tempRow.insertCell(4).innerHTML = values.effective_radius;
+			tempRow.insertCell(5).innerHTML = values.time;
+			rowCounter += 1;
+       	}
+
+
+     	
+     }
+     function filterData(){
+        // retrieve inputs
+        var searchLat = document.getElementById("searchlat").value;
+        var searchLon = document.getElementById("searchlon").value;
+        var searchPt = new BMap.Point(parseFloat(searchLon),parseFloat(searchLat));
+        // search for all earth quakes effecting given point
+        var result = {};
+        for (var key in global_data){
+          var values = global_data[key];
+          centerPt = new BMap.Point(values.lon,values.lat);
+          qResult = pointInCircle(searchPt,values.effective_radius*1000,centerPt)
+          if (qResult == true){
+            result[key] = values;
+          }
+        }
+        displayData(result);
+        var marker = new BMap.Marker(searchPt);
+        map.addOverlay(marker);
+        map.centerAndZoom(searchPt,5);
+        
+      }
+
+     function pointInCircle(point,radius,center){
+     	return (map.getDistance(point,center) <= radius);
+     }
+
+
+
+	$(document).ready(initialize);
+
+</script>

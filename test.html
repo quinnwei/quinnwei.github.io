@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      #map-canvas{
+        height:500px;
+      }
+      #show-eq{
+        float:left;
+      }
+      #displayTable,td{
+        border: 1px solid black;
+      }
+      td{
+        padding:3px;
+      }
+      input{
+
+      }
+    </style>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.js"></script>
+    <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?libraries=geometry"></script>
+
+    <script>
+      var global_data;
+      var map;
+      var circleArray;
+      var markers = [];
+
+      function initialize(){
+        var mapCanvas = document.getElementById('map-canvas');
+        var mapOptions = {
+          center: new google.maps.LatLng(35,103),
+          zoom:3,
+          mapTypeId: google.maps.MapTypeId.ROADMAP
+        }
+        map = new google.maps.Map(mapCanvas,mapOptions)
+      }
+
+      function eqfeed_callback(results) {
+        map.data.addGeoJson(results);
+      }
+
+      function loadData(){
+        
+        $.getJSON('pdata.json',function(input){
+          global_data = input;
+          displayData(global_data)
+        });
+
+      }
+
+      function displayData(data){
+        if (circleArray){
+          for (var i in circleArray){
+            circleArray[i].setMap(null);
+          }
+        }
+        circleArray = new Array();
+
+
+        //set the columns fof the table
+        var table = document.getElementById("displayTable");
+        table.innerHTML="";
+        var firstRow = table.insertRow(0);
+        firstRow.insertCell(0).innerHTML = "Title";
+        firstRow.insertCell(1).innerHTML = "Latitude";
+        firstRow.insertCell(2).innerHTML = "Longitude";
+        firstRow.insertCell(3).innerHTML = "Magnitude";
+        firstRow.insertCell(4).innerHTML = "Effective Radius";
+        firstRow.insertCell(5).innerHTML = "Time";
+
+
+
+
+        var rowCounter = 1;
+
+        for (var key in data) {
+          var values = data[key];
+          // add earthquake to google maps
+          var c = new google.maps.LatLng(values.lat,values.lon);
+          var r = values.effective_radius;
+
+          var eqProperties = {
+            strokeColor:'#FF0000',
+            strokeOpacity:0.3,
+            fillColor:'#FF0000',
+            fillOpacity:0,
+            map:map,
+            center: c,
+            radius: r*1000
+          }
+          eqCircle = new google.maps.Circle(eqProperties);
+          circleArray.push(eqCircle);
+
+          // add earthquake to displayTable
+          console.log(rowCounter);
+          var tempRow = table.insertRow(rowCounter);
+          tempRow.insertCell(0).innerHTML = values.title;
+          tempRow.insertCell(1).innerHTML = values.lat;
+          tempRow.insertCell(2).innerHTML = values.lon;
+          tempRow.insertCell(3).innerHTML = values.mag;
+          tempRow.insertCell(4).innerHTML = values.effective_radius;
+          tempRow.insertCell(5).innerHTML = values.time;
+          rowCounter += 1;
+        }
+      }
+
+      function hideCircles(){
+        if (circleArray){
+          for (var i in circleArray){
+            circleArray[i].setVisible(false);
+          }
+        }
+      }
+      function showCircles(){
+        if (circleArray){
+          for (var i in circleArray){
+            circleArray[i].setVisible(true);
+          }
+        }
+      }
+
+
+
+      function pointInCircle(point, radius, center){
+        return (google.maps.geometry.spherical.computeDistanceBetween(point,center) <= radius);
+      }
+
+      function filterData(){
+        // retrieve inputs
+        var searchLat = document.getElementById("searchlat").value;
+        var searchLon = document.getElementById("searchlon").value;
+        var searchPt = new google.maps.LatLng(parseFloat(searchLat),parseFloat(searchLon));
+        // search for all earth quakes effecting given point
+        var result = {};
+        for (var key in global_data){
+          var values = global_data[key];
+          centerPt = new google.maps.LatLng(values.lat,values.lon);
+          qResult = pointInCircle(searchPt,values.effective_radius*1000,centerPt)
+          if (qResult == true){
+            result[key] = values;
+          }
+        }
+        console.log(result);
+        displayData(result);
+        //clear current markers
+        deleteMarkers();
+        // set marker
+        addMarker(searchPt);
+      }
+
+      function addMarker(location){
+        var marker = new google.maps.Marker({
+          position: location,
+          map: map
+        })
+        markers.push(marker);
+      }
+
+      function setAllMap(map){
+        for (var i = 0; i < markers.length; i++){
+          markers[i].setMap(map);
+        }
+      }
+
+      function clearMarkers(){
+        setAllMap(null);
+      }
+      function deleteMarkers(){
+        clearMarkers();
+        markers = [];
+      }
+
+
+
+
+      $(document).ready(loadData);
+      google.maps.event.addDomListener(window,'load',initialize);
+  </script>
+
+  </head>
+  <body>
+
+    <div id="map-canvas"></div>
+    <div>
+      <button type="button" id="show-eq" onclick="showCircles()"> Show EQs</button>
+      <button type="button" id="hide-eq" onclick="hideCircles()"> Hide EQs</button>
+      <br>
+      Enter Lat: <input type="number" step="0.01" name="searchlat" id="searchlat">
+      <br>
+      Enter Lon: <input type="number" step="0.01" name="searchlon" id="searchlon">
+      <br>
+      <button type="button" id="search" onclick="filterData()"> Search </button>
+
+    </div>
+    <div>
+      <table id ="displayTable">
+        <tr>
+          <td>Title</td>
+          <td>Latitude</td>
+          <td>Longitude</td>
+          <td>Magnitude</td>
+          <td>Effective Radius</td>
+          <td>Time</td>
+        </tr>
+      </table>
+    </div>
+
+  </body>
+</html>
